@@ -1,5 +1,17 @@
 package com.twilio.video.recordings;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.twilio.Twilio;
+import com.twilio.http.HttpMethod;
+import com.twilio.http.NetworkHttpClient;
+import com.twilio.http.Request;
+import com.twilio.http.Response;
+import com.twilio.http.TwilioRestClient;
+import com.twilio.rest.Domains;
+
+import org.apache.http.impl.client.HttpClientBuilder;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,64 +59,112 @@ public class RecordingsDecrypter {
                 "This program downloads an encrypted Twilio Video Recording pre-signed URL, downloads the recording " +
                         "file, and decrypts it in your box.");
         System.out.println("\nSample usage\n" +
-                "java -jar twilio-recordings-decrypter.jar ./privateKeyPkcs8.pem " +
-                "\"https://com-twilio-us1-video-recording.s3.amazonaws.com/ACxx...\" ./decrypted_video.mkv");
+                "java -jar twilio-recordings-decrypter.jar ./privateKeyPkcs8.pem API_KEY:API_SECRET RTxxx ./decrypted_video.mkv");
         System.out.println("You need to pass three arguments to the program\n" +
-                "\t ./privateKeyPkcs8.pem: This is the path to a text file containing your PKCS8-formatted private " +
+                "\t./privateKeyPkcs8.pem: This is the path to a text file containing your PKCS8-formatted private " +
                 "key.\n" +
-                "\t\"https://com-twilio-us1-video-recording.s3.amazonaws.com/ACxx...\": A pre-signed URL obtained " +
-                "from the video.twilio.com/v1Recordings/RTxxx/Media " +
-                "resource\n" +
+                "\tAPI_KEY:API_SECRET: API key and secret for your account\n" +
+                "\tRTxxx: A recording track sid\n" +
                 "\t./decrypted_video.mkv: Path to local destination");
     }
 
     public static void main(final String... args) {
 
-        if (args.length != 3) {
+        if (args.length != 4) {
             printHelp();
+            return;
         }
 
         final String privateKeyStr;
         try {
-            privateKeyStr = new String(Files.readAllBytes(Paths.get(args[0])));
-        } catch (IOException e) {
-            System.out.println("The file " + args[0] +
+            privateKeyStr = new String(Files.readAllBytes(Paths.get(args[2])));
+        } catch (final IOException e) {
+            System.out.println("The file " + args[2] +
                     " containing the private key could not be read. Program will exit now");
             return;
         }
 
         final PrivateKey privateKey;
-
         try {
             privateKey = loadPrivateKey(privateKeyStr);
         } catch (final IllegalArgumentException | NoSuchAlgorithmException | InvalidKeySpecException e) {
-            System.out.println("The file " + args[0] + " contains a private key that can't be parsed. " +
+            System.out.println("The file " + args[2] + " contains a private key that can't be parsed. " +
                     "Check that the file contains a PKCS8 formatted key. Program will exit now.");
             return;
         }
 
+        String[] credentials = args[0].split(":");
+        final String apiKeySid = credentials[0];
+        final String apiKeySecret = credentials[1];
+        final String recordingSid = args[1];
         final URL presignedUrl;
         try {
-            presignedUrl = new URL(args[1]);
-        } catch (MalformedURLException e) {
-            System.out.println("The URL " + args[1] +
-                    " is not a valid URL. Program will exit now.");
+            presignedUrl = getMediaUrl(recordingSid, apiKeySid, apiKeySecret);
+        } catch (final Exception e) {
             return;
         }
 
-        final Path destinationFile = Paths.get(args[2]);
-
+        final Path destinationFile = Paths.get(args[3]);
         try {
             decryptFile(presignedUrl, privateKey, destinationFile);
         } catch (IOException e) {
             System.out.println("There was an error decrypting the file in your local system. Program will exit now.");
             return;
-        } catch (GeneralSecurityException e) {
+        } catch (final GeneralSecurityException e) {
             System.out.println(
                     "There was an error creating the cryptographic material to decrypt the file. Please check that " +
                             "the private key is in PKCS#8 format, and that the public key used to encrypt the file is" +
                             " derived from this private key. Program will exit now.");
             return;
+        }
+    }
+
+    private static URL getMediaUrl(final String recordingSid, final String apiKeySid,
+                                   final String apiKeySecret) throws IOException {
+        // We need to create a TwilioRestClient that doe snot follow redirects
+        final NetworkHttpClient networkHttpClient =
+                new NetworkHttpClient(
+                        HttpClientBuilder
+                                .create()
+                                .disableRedirectHandling()
+                                .useSystemProperties());
+        final TwilioRestClient restClient =
+                new TwilioRestClient
+                        .Builder(apiKeySid, apiKeySecret)
+                        .httpClient(networkHttpClient)
+                        .build();
+
+        Twilio.setRestClient(restClient);
+        final Request request = new Request(
+                HttpMethod.GET,
+                Domains.VIDEO.toString(),
+                "/v1/Recordings/" + recordingSid + "/Media/",
+                restClient.getRegion());
+        final Response response = restClient.request(request);
+
+        if (response.getStatusCode() == 302) {
+            final ObjectNode node;
+            try {
+                node = new ObjectMapper().readValue(response.getStream(), ObjectNode.class);
+            } catch (final IOException e) {
+                System.out.println("Error reading response from server");
+                throw e;
+            }
+
+            final String presignedUrlStr = String.valueOf(node.get("redirect_to").asText());
+            final URL presignedUrl;
+            try {
+                presignedUrl = new URL(presignedUrlStr);
+            } catch (final IllegalArgumentException | NullPointerException | MalformedURLException e) {
+                System.out.println("The URL " + presignedUrlStr + " is not a valid URL. Program will exit now.");
+                return null;
+            }
+
+            return presignedUrl;
+        } else {
+            System.out.println("The server responded with " + response.getStatusCode() +
+                    " code. Recording will not be downloaded.\n" + response.getContent());
+            return null;
         }
     }
 
@@ -115,7 +175,7 @@ public class RecordingsDecrypter {
         final HttpURLConnection conn;
         try {
             conn = (HttpURLConnection) recordingUrl.openConnection();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             System.out.println("Error occurred while trying to connect to " + recordingUrl + ". Program will exit now");
             return;
         }
@@ -126,7 +186,7 @@ public class RecordingsDecrypter {
                     "The pre-signed URL TTL has expired. Please obtain a new URL from the Video Recordings Service. " +
                             "Program will exit now.");
             return;
-        } else if (conn.getResponseCode() != 302) {
+        } else if (conn.getResponseCode() != 200) {
             System.out.println(
                     "The response code " + conn.getResponseCode() +
                             " from the server is not valid (should be 302). Program will exit now.");
