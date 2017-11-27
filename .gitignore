@@ -1,0 +1,36 @@
+# Eclipse
+.classpath
+.project
+.settings/
+.metadata/
+
+# Intellij
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Mac
+.DS_Store
+
+# Maven
+log/
+target/
+logs/
+
+
+# Git
+*.orig
+
+# Scripts
+mysql_settings.sh
+
+# Python
+*.pyc
+
+media-recording-service-local-jonas.yml
+dependency-reduced-pom.xml
+
+RecordingEntity.java
+RecordingTag.java
+**/Transactions/*
