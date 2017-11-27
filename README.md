@@ -25,3 +25,4 @@ In order to convert it to PKCS#8 format, you'll need to execute the following co
 2. Execute the jar file with the appropriate arguments
     ```
     java -jar target/twilio-recordings-decrypter.jar SKxxxx:API_SECRET RTxx privatekey-pkcs8.pem decrypted_video_file.mkv
+    ```
