@@ -4,6 +4,11 @@ This program downloads a Twilio Video Track Recording file. The track is downloa
 `Media` resource from the Room Recordings REST API. Tracks are encrypted with an asymmetric key, so the you'll need to 
 provide the private key from the pair that was used to encrypt the recording.
 
+### PRE-REQUISITES
+
+* Java 8.
+* If you are using Oracle's JDK, you need have installed the [Java Cryptography Extension (JCE) Unlimited Strength Jurisdiction Policy Files](http://www.oracle.com/technetwork/java/javase/downloads/jce8-download-2133166.html)
+in your system.
 
 ## Usage
 

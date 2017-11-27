@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
@@ -59,7 +60,8 @@ public class RecordingsDecrypter {
                 "This program downloads an encrypted Twilio Video Recording pre-signed URL, downloads the recording " +
                         "file, and decrypts it in your box.");
         System.out.println("\nSample usage\n" +
-                "java -jar twilio-recordings-decrypter.jar ./privateKeyPkcs8.pem API_KEY:API_SECRET RTxxx ./decrypted_video.mkv");
+                "java -jar twilio-recordings-decrypter.jar ./privateKeyPkcs8.pem API_KEY:API_SECRET RTxxx " +
+                "./decrypted_video.mkv");
         System.out.println("You need to pass three arguments to the program\n" +
                 "\t./privateKeyPkcs8.pem: This is the path to a text file containing your PKCS8-formatted private " +
                 "key.\n" +
@@ -205,7 +207,13 @@ public class RecordingsDecrypter {
 
         // Once we have the symmetric master key, we can decrypt the contents
         cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(DECRYPT_MODE, cek, new IvParameterSpec(iv));
+        try {
+            cipher.init(DECRYPT_MODE, cek, new IvParameterSpec(iv));
+        } catch (final InvalidKeyException e) {
+            System.out.println(
+                    "Invalid key exception. Please make sure that Java Cryptography Extensions with unlimited " +
+                            "jurisdiction are installed");
+        }
         try (final InputStream in = conn.getInputStream()) {
             try (final CipherInputStream cis = new CipherInputStream(in, cipher)) {
                 try (final FileOutputStream fos = new FileOutputStream(destination.toFile())) {
