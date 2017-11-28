@@ -98,7 +98,7 @@ public class RecordingsDecrypter {
             return;
         }
 
-        System.out.println("Private key loaded successfully ...")
+        System.out.println("Private key loaded successfully ...");
 
         //Obtain Twilio's API key and secret from command line args.
         String[] credentials = args[0].split(":");
@@ -115,12 +115,12 @@ public class RecordingsDecrypter {
             return;
         }
 
-        System.out.println("Presigned media URL obtained successfully ...")
+        System.out.println("Presigned media URL obtained successfully ...");
 
         //Prepare destination file and decrypt
         final Path destinationFile = Paths.get(args[3]);
 
-        System.out.println("Starting media decryption ...")
+        System.out.println("Starting media decryption ...");
         try {
             decryptFile(presignedUrl, privateKey, destinationFile);
         } catch (IOException e) {
@@ -134,7 +134,7 @@ public class RecordingsDecrypter {
             return;
         }
 
-        System.out.println("Media decryption completed successfully.")
+        System.out.println("Media decryption completed successfully.");
     }
 
     //Obtains the presignedUrl associated to a given Recording SID
