@@ -43,9 +43,10 @@ public class RecordingsDecrypter {
     private static final Pattern newlinePatternTabsAndSpaces = Pattern.compile("\r\n|\r|\n|\t|\\s");
     private static final Pattern keyPattern = Pattern.compile("-----[BEGIN|END]([A-Z ]+) KEY-----");
 
-
+    //Load PKCS #8 private key from the specified filename and returns it as a PrivateKey object.
     public static PrivateKey loadPrivateKey(final String key) throws NoSuchAlgorithmException, InvalidKeySpecException {
 
+        //Remove header and footer of file
         String sanitized = keyPattern.matcher(key).replaceAll("");
         sanitized = newlinePatternTabsAndSpaces.matcher(sanitized).replaceAll("");
 
@@ -55,18 +56,18 @@ public class RecordingsDecrypter {
         return keyFactory.generatePrivate(keySpec);
     }
 
+    //Print usage instructions
     private static void printHelp() {
         System.out.println(
-                "This program downloads an encrypted Twilio Video Recording pre-signed URL, downloads the recording " +
-                        "file, and decrypts it in your box.");
-        System.out.println("\nSample usage\n" +
+                "This program downloads and decrypts an encrypted Twilio Video Recording");
+        System.out.println("\nUsage:\n" +
                 "java -jar twilio-recordings-decrypter.jar ./privateKeyPkcs8.pem API_KEY:API_SECRET RTxxx " +
                 "./decrypted_video.mkv");
-        System.out.println("You need to pass three arguments to the program\n" +
-                "\t./privateKeyPkcs8.pem: This is the path to a text file containing your PKCS8-formatted private " +
+        System.out.println("Where:\n" +
+                "\t./privateKeyPkcs8.pem is the path to a file containing your PKCS8-formatted private " +
                 "key.\n" +
-                "\tAPI_KEY:API_SECRET: API key and secret for your account\n" +
-                "\tRTxxx: A recording track sid\n" +
+                "\tAPI_KEY:API_SECRET: Twilio's API key and secret for your account\n" +
+                "\tRTxxx: the recording track SID you want to download and decrypt\n" +
                 "\t./decrypted_video.mkv: Path to local destination");
     }
 
@@ -77,6 +78,7 @@ public class RecordingsDecrypter {
             return;
         }
 
+        //Obtain path to the file containing the private key
         final String privateKeyStr;
         try {
             privateKeyStr = new String(Files.readAllBytes(Paths.get(args[2])));
@@ -86,6 +88,7 @@ public class RecordingsDecrypter {
             return;
         }
 
+        //Load private key form file
         final PrivateKey privateKey;
         try {
             privateKey = loadPrivateKey(privateKeyStr);
@@ -95,18 +98,29 @@ public class RecordingsDecrypter {
             return;
         }
 
+        System.out.println("Private key loaded successfully ...")
+
+        //Obtain Twilio's API key and secret from command line args.
         String[] credentials = args[0].split(":");
         final String apiKeySid = credentials[0];
         final String apiKeySecret = credentials[1];
+        //Obtain recording SID from command line args.
         final String recordingSid = args[1];
         final URL presignedUrl;
+
+        //Obtain presignedUrl where the encrypted media can be downloaded
         try {
             presignedUrl = getMediaUrl(recordingSid, apiKeySid, apiKeySecret);
         } catch (final Exception e) {
             return;
         }
 
+        System.out.println("Presigned media URL obtained successfully ...")
+
+        //Prepare destination file and decrypt
         final Path destinationFile = Paths.get(args[3]);
+
+        System.out.println("Starting media decryption ...")
         try {
             decryptFile(presignedUrl, privateKey, destinationFile);
         } catch (IOException e) {
@@ -119,11 +133,13 @@ public class RecordingsDecrypter {
                             " derived from this private key. Program will exit now.");
             return;
         }
+
+        System.out.println("Media decryption completed successfully.")
     }
 
+    //Obtains the presignedUrl associated to a given Recording SID
     private static URL getMediaUrl(final String recordingSid, final String apiKeySid,
                                    final String apiKeySecret) throws IOException {
-        // We need to create a TwilioRestClient that doe snot follow redirects
         final NetworkHttpClient networkHttpClient =
                 new NetworkHttpClient(
                         HttpClientBuilder
@@ -170,6 +186,7 @@ public class RecordingsDecrypter {
         }
     }
 
+    //Decrypts the file downloaded from recordingUrl using privateKey to decrypt the envelope
     private static void decryptFile(final URL recordingUrl,
                                     final PrivateKey privateKey,
                                     final Path destination) throws GeneralSecurityException, IOException {
