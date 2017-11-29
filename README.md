@@ -17,13 +17,13 @@ The program requires the following arguments
   ```
   openssl pkcs8 -in private_key.pem -topk8 -nocrypt -out private_key_pkcs8.pem
   ```
-* The filename where the decrypted media will be stored.
+* The filename where the decrypted media will be stored. Remember to add the extension `.mkv` if recording is a video track or `.mka` if the recording is an audio track.
 
 1. Compile the project
     ```
     mvn clean package
     ```
-2. Execute the jar file with the appropriate arguments
+2. Execute the jar file with the appropriate arguments. For example, for a video track:
     ```
-    java -jar target/twilio-recordings-decrypter.jar SKxx:API_SECRET RTxx privatekey-pkcs8.pem decrypted-filename.webm
+    java -jar target/twilio-recordings-decrypter.jar SKxx:API_SECRET RTxx privatekey-pkcs8.pem decrypted-filename.mkv
     ```
