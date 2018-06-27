@@ -1,4 +1,4 @@
-package com.twilio.video.recordings;
+package com.twilio.video;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -38,7 +38,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import static javax.crypto.Cipher.DECRYPT_MODE;
 
-public class RecordingsDecrypter {
+public class MediaFileDecrypter {
 
     private static final Pattern newlinePatternTabsAndSpaces = Pattern.compile("\r\n|\r|\n|\t|\\s");
     private static final Pattern keyPattern = Pattern.compile("-----[BEGIN|END]([A-Z ]+) KEY-----");
@@ -59,15 +59,15 @@ public class RecordingsDecrypter {
     //Print usage instructions
     private static void printHelp() {
         System.out.println(
-                "This program downloads and decrypts an encrypted Twilio Video Recording");
+                "This program downloads and decrypts an encrypted Twilio Video Recording or Composition");
         System.out.println("\nUsage:\n" +
-                "java -jar twilio-recordings-decrypter.jar ./privateKeyPkcs8.pem API_KEY:API_SECRET RTxxx " +
+                "java -jar twilio-media-decrypter.jar ./privateKeyPkcs8.pem API_KEY:API_SECRET SidToDecrypt " +
                 "./decrypted_video.mkv");
         System.out.println("Where:\n" +
                 "\t./privateKeyPkcs8.pem is the path to a file containing your PKCS8-formatted private " +
                 "key.\n" +
                 "\tAPI_KEY:API_SECRET: Twilio's API key and secret for your account\n" +
-                "\tRTxxx: the recording track SID you want to download and decrypt\n" +
+                "\tSidToDecrypt: the Recording or Composition SID you want to download and decrypt\n" +
                 "\t./decrypted_video.mkv: Path to local destination");
     }
 
@@ -104,13 +104,13 @@ public class RecordingsDecrypter {
         String[] credentials = args[0].split(":");
         final String apiKeySid = credentials[0];
         final String apiKeySecret = credentials[1];
-        //Obtain recording SID from command line args.
-        final String recordingSid = args[1];
+        //Obtain recording / composition SID from command line args.
+        final String mediaFileSid = args[1];
         final URL presignedUrl;
 
         //Obtain presignedUrl where the encrypted media can be downloaded
         try {
-            presignedUrl = getMediaUrl(recordingSid, apiKeySid, apiKeySecret);
+            presignedUrl = getMediaUrl(mediaFileSid, apiKeySid, apiKeySecret);
         } catch (final Exception e) {
             return;
         }
@@ -137,8 +137,8 @@ public class RecordingsDecrypter {
         System.out.println("Media decryption completed successfully.");
     }
 
-    //Obtains the presignedUrl associated to a given Recording SID
-    private static URL getMediaUrl(final String recordingSid, final String apiKeySid,
+    //Obtains the presignedUrl associated to a given Recording / Composition SID
+    private static URL getMediaUrl(final String mediaFileSid, final String apiKeySid,
                                    final String apiKeySecret) throws IOException {
         final NetworkHttpClient networkHttpClient =
                 new NetworkHttpClient(
@@ -153,10 +153,20 @@ public class RecordingsDecrypter {
                         .build();
 
         Twilio.setRestClient(restClient);
+        
+        String pathSection;
+        if(mediaFileSid.startsWith("RT")){
+        	pathSection="/Recordings/";
+        } else if (mediaFileSid.startsWith("CJ")){
+        	pathSection="/Compositions/";
+        } else {
+        	throw new RuntimeException("The provided SidToDecrypt is neither a RecordingSid nor a CompositionSid");
+        }
+        
         final Request request = new Request(
                 HttpMethod.GET,
                 Domains.VIDEO.toString(),
-                "/v1/Recordings/" + recordingSid + "/Media/",
+                "/v1" + pathSection + mediaFileSid + "/Media/",
                 restClient.getRegion());
         final Response response = restClient.request(request);
 
@@ -181,28 +191,28 @@ public class RecordingsDecrypter {
             return presignedUrl;
         } else {
             System.out.println("The server responded with " + response.getStatusCode() +
-                    " code. Recording will not be downloaded.\n" + response.getContent());
+                    " code. Media file will not be downloaded.\n" + response.getContent());
             return null;
         }
     }
 
-    //Decrypts the file downloaded from recordingUrl using privateKey to decrypt the envelope
-    private static void decryptFile(final URL recordingUrl,
+    //Decrypts the file downloaded from mediaFileUrl using privateKey to decrypt the envelope
+    private static void decryptFile(final URL mediaFileUrl,
                                     final PrivateKey privateKey,
                                     final Path destination) throws GeneralSecurityException, IOException {
 
         final HttpURLConnection conn;
         try {
-            conn = (HttpURLConnection) recordingUrl.openConnection();
+            conn = (HttpURLConnection) mediaFileUrl.openConnection();
         } catch (final IOException e) {
-            System.out.println("Error occurred while trying to connect to " + recordingUrl + ". Program will exit now");
+            System.out.println("Error occurred while trying to connect to " + mediaFileUrl + ". Program will exit now");
             return;
         }
 
 
         if (conn.getResponseCode() == 403) {
             System.out.println(
-                    "The pre-signed URL TTL has expired. Please obtain a new URL from the Video Recordings Service. " +
+                    "The pre-signed URL TTL has expired. Please obtain a new URL from the Video Recordings/Compositions Service. " +
                             "Program will exit now.");
             return;
         } else if (conn.getResponseCode() != 200) {

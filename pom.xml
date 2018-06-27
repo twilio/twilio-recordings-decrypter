@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.twilio.</groupId>
-    <artifactId>twilio-recordings-decrypter</artifactId>
+    <artifactId>twilio-media-decrypter</artifactId>
     <version>1.0-SNAPSHOT</version>
     <url>https://www.twilio.com</url>
 
@@ -38,14 +38,14 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mainClass>com.twilio.video.recordings.RecordingsDecrypter</mainClass>
+        <mainClass>com.twilio.video.MediaFileDecrypter</mainClass>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.twilio.sdk</groupId>
             <artifactId>twilio</artifactId>
-            <version>7.16.0</version>
+            <version>7.21.5</version>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
